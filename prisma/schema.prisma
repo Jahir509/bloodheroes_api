@@ -1,0 +1,115 @@
+generator client {
+  provider        = "prisma-client"
+  output          = "../src/generated/prisma"
+  moduleFormat    = "cjs"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  extensions = [postgis,pg_trgm]
+}
+
+enum BloodGroup {
+  A_POS
+  A_NEG
+  B_POS
+  B_NEG
+  AB_POS
+  AB_NEG
+  O_POS
+  O_NEG
+}
+
+enum Gender {
+  MALE
+  FEMALE
+}
+
+// ---------- Locations (loaded from your GeoJSON in Step 5) ----------
+
+model District {
+  id         Int       @id @default(autoincrement())
+  code       String    @unique // the code from your GeoJSON, e.g. ADM2_PCODE
+  name       String
+  nameBn     String    @map("name_bn")
+  division   String?
+  geom       Unsupported("geometry(MultiPolygon, 4326)")?                     // full detail
+  geomSimple Unsupported("geometry(MultiPolygon, 4326)")? @map("geom_simple") // light, for the map
+  upazilas   Upazila[]
+
+  @@map("districts")
+}
+
+model Upazila {
+  id         Int      @id @default(autoincrement())
+  code       String   @unique
+  name       String
+  nameBn     String   @map("name_bn")
+  districtId Int      @map("district_id")
+  geom       Unsupported("geometry(MultiPolygon, 4326)")?
+  geomSimple Unsupported("geometry(MultiPolygon, 4326)")? @map("geom_simple")
+  district   District @relation(fields: [districtId], references: [id])
+  donors     Donor[]
+
+  @@index([districtId])
+  @@map("upazilas")
+}
+
+// ---------- People ----------
+
+model User {
+  id        String          @id @default(cuid())
+  phone     String          @unique // +8801XXXXXXXXX
+  createdAt DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  donor     Donor?
+  reveals   ContactReveal[]
+
+  @@map("users")
+}
+
+model OtpCode {
+  id        String    @id @default(cuid())
+  phone     String
+  codeHash  String    @map("code_hash")
+  attempts  Int       @default(0)
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@index([phone, createdAt])
+  @@map("otp_codes")
+}
+
+model Donor {
+  id            String          @id @default(cuid())
+  userId        String          @unique @map("user_id")
+  fullName      String          @map("full_name")
+  bloodGroup    BloodGroup      @map("blood_group")
+  gender        Gender
+  upazilaId     Int             @map("upazila_id")
+  areaNote      String?         @map("area_note") @db.VarChar(120)
+  lastDonatedAt DateTime?       @map("last_donated_at") @db.Date
+  isAvailable   Boolean         @default(true) @map("is_available")
+  isVisible     Boolean         @default(true) @map("is_visible")
+  createdAt     DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime        @updatedAt @map("updated_at") @db.Timestamptz(3)
+  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  upazila       Upazila         @relation(fields: [upazilaId], references: [id])
+  reveals       ContactReveal[]
+
+  @@index([upazilaId, bloodGroup, isVisible, lastDonatedAt]) // the search index
+  @@map("donors")
+}
+
+model ContactReveal {
+  id          String   @id @default(cuid())
+  requesterId String   @map("requester_id")
+  donorId     String   @map("donor_id")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  requester   User     @relation(fields: [requesterId], references: [id], onDelete: Cascade)
+  donor       Donor    @relation(fields: [donorId], references: [id], onDelete: Cascade)
+
+  @@index([requesterId, createdAt])
+  @@map("contact_reveals")
+}
