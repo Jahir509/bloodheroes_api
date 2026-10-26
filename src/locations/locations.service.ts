@@ -7,7 +7,7 @@ export class LocationsService {
 
   districts() {
     return this.prisma.district.findMany({
-      select: { id: true, name: true, nameBn: true, divisionId: true },
+      select: { id: true, name: true, nameBn: true },
       orderBy: { name: 'asc' },
     });
   }
