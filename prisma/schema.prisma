@@ -73,8 +73,8 @@ model OtpCode {
   phone     String
   codeHash  String    @map("code_hash")
   attempts  Int       @default(0)
-  expiresAt DateTime  @map("expires_at")
-  usedAt    DateTime? @map("used_at")
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz(3)
+  usedAt    DateTime? @map("used_at") @db.Timestamptz(3)
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
 
   @@index([phone, createdAt])
@@ -82,7 +82,7 @@ model OtpCode {
 }
 
 model Donor {
-  id            String          @id @default(cuid())
+  id            String          @id @default(uuid())
   userId        String          @unique @map("user_id")
   fullName      String          @map("full_name")
   bloodGroup    BloodGroup      @map("blood_group")
